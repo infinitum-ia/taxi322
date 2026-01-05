@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cliente de Prueba WebSocket - Taxi Voice Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .status {
+            padding: 15px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .thread-info {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .chat-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-user {
+            text-align: right;
+        }
+
+        .message-assistant {
+            text-align: left;
+        }
+
+        .message-bubble {
+            display: inline-block;
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message-user .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message-assistant .message-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #dee2e6;
+        }
+
+        .message-meta {
+            font-size: 0.75em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .config-area {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .config-area label {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-size: 0.9em;
+            color: #495057;
+        }
+
+        .config-area input {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            font-size: 0.9em;
+            min-width: 150px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            border-color: #667eea;
+        }
+
+        .input-group button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .input-group button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .input-group button:active {
+            transform: translateY(0);
+        }
+
+        .input-group button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .events-panel {
+            width: 400px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .events-header {
+            padding: 15px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .events-header h3 {
+            font-size: 1em;
+            color: #cccccc;
+        }
+
+        .clear-btn {
+            padding: 5px 15px;
+            background: #3e3e42;
+            color: #cccccc;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .clear-btn:hover {
+            background: #505050;
+        }
+
+        .events-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .event {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #252526;
+            border-left: 3px solid #007acc;
+            border-radius: 3px;
+        }
+
+        .event.event-stt_chunk { border-left-color: #4ec9b0; }
+        .event.event-stt_output { border-left-color: #4ec9b0; font-weight: bold; }
+        .event.event-agent_chunk { border-left-color: #dcdcaa; }
+        .event.event-agent_end { border-left-color: #ce9178; }
+        .event.event-tool_call { border-left-color: #c586c0; }
+        .event.event-tool_result { border-left-color: #9cdcfe; }
+        .event.event-agent_error { border-left-color: #f48771; }
+        .event.event-system_message { border-left-color: #608b4e; }
+
+        .event-type {
+            color: #569cd6;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .event-data {
+            color: #d4d4d4;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .controls {
+            padding: 15px;
+            background: #2d2d30;
+            border-top: 1px solid #3e3e42;
+            display: flex;
+            gap: 10px;
+        }
+
+        .controls button {
+            flex: 1;
+            padding: 10px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .controls button:hover {
+            background: #1177bb;
+        }
+
+        .controls button.danger {
+            background: #d13438;
+        }
+
+        .controls button.danger:hover {
+            background: #e81123;
+        }
+
+        /* Scrollbar personalizado */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .events-list::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .events-list::-webkit-scrollbar-thumb {
+            background: #3e3e42;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚕 Cliente de Prueba WebSocket</h1>
+            <p>Arquitectura Sandwich - Streaming en Tiempo Real</p>
+        </div>
+
+        <div class="status">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Desconectado</span>
+            </div>
+            <div class="thread-info">
+                Thread: <strong id="threadId">-</strong>
+            </div>
+        </div>
+
+        <div class="main">
+            <div class="chat-panel">
+                <div class="messages" id="messages"></div>
+                <div class="config-area">
+                    <label>
+                        <strong>User ID:</strong>
+                        <input type="text" id="userIdInput" value="test_user" placeholder="Ej: operador_maria">
+                    </label>
+                    <label>
+                        <strong>Client ID (Teléfono):</strong>
+                        <input type="text" id="clientIdInput" value="3022370040" placeholder="Ej: 3022370040">
+                    </label>
+                </div>
+                <div class="input-area">
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            id="messageInput"
+                            placeholder="Escribe tu mensaje (ej: Necesito un taxi a la Calle 72 #43-25)..."
+                            disabled
+                        >
+                        <button id="sendBtn" disabled>Enviar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="events-panel">
+                <div class="events-header">
+                    <h3>📡 Eventos en Tiempo Real</h3>
+                    <button class="clear-btn" id="clearEventsBtn">Limpiar</button>
+                </div>
+                <div class="events-list" id="eventsList"></div>
+                <div class="controls">
+                    <button id="connectBtn">Conectar</button>
+                    <button id="disconnectBtn" class="danger" disabled>Desconectar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado global
+        let ws = null;
+        let threadId = null;
+        let currentAssistantMessage = "";
+        let currentAgent = "";
+
+        // Referencias a elementos DOM
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const threadIdDisplay = document.getElementById('threadId');
+        const messagesDiv = document.getElementById('messages');
+        const eventsListDiv = document.getElementById('eventsList');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearEventsBtn = document.getElementById('clearEventsBtn');
+
+        // Configuración
+        //const WS_URL = 'ws://localhost:8000/api/v1/ws/chat';
+        const WS_URL = 'https://1h4b021c-8000.use2.devtunnels.ms/api/v1/ws/chat';
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendBtn.addEventListener('click', sendMessage);
+        clearEventsBtn.addEventListener('click', () => eventsListDiv.innerHTML = '');
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !sendBtn.disabled) {
+                sendMessage();
+            }
+        });
+
+        // Funciones de conexión
+        function connect() {
+            if (ws) {
+                console.log('Ya hay una conexión activa');
+                return;
+            }
+
+            updateStatus('connecting', 'Conectando...');
+
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                console.log('WebSocket conectado');
+                updateStatus('connected', 'Conectado');
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleEvent(data);
+                } catch (error) {
+                    console.error('Error parseando mensaje:', error);
+                    addEvent({
+                        type: 'error',
+                        error: 'Error parseando mensaje: ' + error.message,
+                        ts: Date.now()
+                    });
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addEvent({
+                    type: 'error',
+                    error: 'Error de conexión',
+                    ts: Date.now()
+                });
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket desconectado');
+                updateStatus('disconnected', 'Desconectado');
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                ws = null;
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || !ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+
+            // Obtener user_id y client_id de los campos de entrada
+            const userId = document.getElementById('userIdInput').value.trim() || 'test_user';
+            const clientId = document.getElementById('clientIdInput').value.trim() || userId;
+
+            // Generar thread_id si no existe
+            if (!threadId) {
+                threadId = generateUUID();
+                threadIdDisplay.textContent = threadId.substring(0, 8) + '...';
+            }
+
+            // Mostrar mensaje del usuario en el chat
+            addChatMessage('user', text);
+
+            // Enviar al servidor
+            const message = {
+                type: 'user_input',
+                text: text,
+                thread_id: threadId,
+                user_id: userId,
+                client_id: clientId
+            };
+
+            ws.send(JSON.stringify(message));
+            messageInput.value = '';
+
+            // Preparar para recibir respuesta del asistente
+            currentAssistantMessage = "";
+            currentAgent = "";
+        }
+
+        function handleEvent(event) {
+            // Agregar evento al panel de eventos
+            addEvent(event);
+
+            // Procesar según tipo de evento
+            switch (event.type) {
+                case 'stt_chunk':
+                    // Mostrar transcripción parcial (opcional)
+                    console.log('Transcripción parcial:', event.text);
+                    break;
+
+                case 'stt_output':
+                    // Transcripción final (ya está en el chat como mensaje del usuario)
+                    console.log('Transcripción final:', event.text);
+                    break;
+
+                case 'agent_chunk':
+                    // Acumular chunks del asistente
+                    currentAssistantMessage += event.text;
+                    currentAgent = event.agent || 'Alice';
+                    updateAssistantMessage(currentAssistantMessage, currentAgent);
+                    break;
+
+                case 'agent_end':
+                    // Finalizar mensaje del asistente
+                    console.log('Agente finalizó:', event.agent);
+                    currentAssistantMessage = "";
+                    break;
+
+                case 'tool_call':
+                    // Llamada a herramienta
+                    console.log('Tool call:', event.name, event.args);
+                    break;
+
+                case 'tool_result':
+                    // Resultado de herramienta
+                    console.log('Tool result:', event.result);
+                    break;
+
+                case 'agent_error':
+                    // Error del agente
+                    addChatMessage('system', '⚠️ Error: ' + event.error);
+                    break;
+
+                case 'system_message':
+                    // Mensaje del sistema
+                    if (event.level === 'error') {
+                        addChatMessage('system', '❌ ' + event.message);
+                    }
+                    break;
+            }
+        }
+
+        function updateStatus(status, text) {
+            statusText.textContent = text;
+            statusDot.className = 'status-dot';
+            if (status === 'connected') {
+                statusDot.classList.add('connected');
+            }
+        }
+
+        function addEvent(event) {
+            const eventDiv = document.createElement('div');
+            eventDiv.className = `event event-${event.type}`;
+
+            const typeDiv = document.createElement('div');
+            typeDiv.className = 'event-type';
+            typeDiv.textContent = event.type;
+
+            const dataDiv = document.createElement('div');
+            dataDiv.className = 'event-data';
+
+            // Formatear datos del evento
+            const eventCopy = { ...event };
+            delete eventCopy.type;
+            dataDiv.textContent = JSON.stringify(eventCopy, null, 2);
+
+            eventDiv.appendChild(typeDiv);
+            eventDiv.appendChild(dataDiv);
+            eventsListDiv.appendChild(eventDiv);
+
+            // Auto-scroll al final
+            eventsListDiv.scrollTop = eventsListDiv.scrollHeight;
+        }
+
+        function addChatMessage(role, text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${role}`;
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            bubbleDiv.textContent = text;
+
+            messageDiv.appendChild(bubbleDiv);
+            messagesDiv.appendChild(messageDiv);
+
+            // Auto-scroll al final
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateAssistantMessage(text, agent) {
+            // Buscar el último mensaje del asistente o crear uno nuevo
+            let lastMessage = messagesDiv.querySelector('.message-assistant:last-child');
+
+            if (!lastMessage || lastMessage.dataset.completed) {
+                // Crear nuevo mensaje
+                lastMessage = document.createElement('div');
+                lastMessage.className = 'message message-assistant';
+                lastMessage.innerHTML = `
+                    <div class="message-bubble"></div>
+                    <div class="message-meta">${agent}</div>
+                `;
+                messagesDiv.appendChild(lastMessage);
+            }
+
+            // Actualizar contenido
+            const bubble = lastMessage.querySelector('.message-bubble');
+            bubble.textContent = text;
+
+            // Actualizar agente
+            const meta = lastMessage.querySelector('.message-meta');
+            meta.textContent = agent;
+
+            // Auto-scroll
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+-r requirements.txt
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.4
+pytest-cov==4.1.0
+
+# Code Quality
+black==24.1.1
+ruff==0.2.0
+mypy==1.8.0
+
+# Dev tools
+ipython==8.21.0
+jupyter==1.0.0
